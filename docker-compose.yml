@@ -1,13 +1,122 @@
-version: '3.7'
+version: '3.8'
 
 services:
-  traefik:
-    image: traefik:2.3
+  minica:
+    image: ghcr.io/bjornsnoen/minica-traefik-api:latest
+    volumes:
+      - ./certs:/app/certificates
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      DOCKER_LISTEN: "yes"
     restart: unless-stopped
+    labels:
+      - traefik.http.routers.minica.rule=Host(`minica.site`)
+      - traefik.http.routers.minica.entrypoints=https
+      - traefik.http.routers.minica.tls=true
+      - traefik.http.services.minica.loadbalancer.server.port=80
+
+  traefik:
+    container_name: traefik
+    image: traefik:latest
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - imagine-retailer-api.site
     ports:
       - "80:80"
       - "443:443"
+      - "6379:6379"
     volumes:
-      - ./config/traefik.yml:/traefik.yml
-      - ./letsencrypt/acme.json:/acme.json
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik.yml:/etc/traefik/traefik.yaml
+      - ./certs:/app/certificates
+    labels:
+      - traefik.http.routers.traefik-https.rule=Host(`traefik.dashboard.site`)
+      - traefik.http.routers.traefik-https.entrypoints=https
+      - traefik.http.routers.traefik-https.tls=true
+      - traefik.http.routers.traefik-http.service=api@internal
+      - traefik.http.routers.traefik-https.service=api@internal
+      # global redirect to https
+      - traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)
+      - traefik.http.routers.http-catchall.entrypoints=http
+      - traefik.http.routers.http-catchall.middlewares=redirect-to-https
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+
+  mariadb:
+    image: mariadb:10.7.4
+    ports:
+      - "3306:3306"
+    volumes:
+      - db:/var/lib/mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_USER: root
+      MYSQL_ROOT_PASSWORD: root
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    # PORT 1025 for SMTP
+    labels:
+      - traefik.http.routers.mailhog.rule=Host(`mailhog.site`)
+      - traefik.http.routers.mailhog.entrypoints=https
+      - traefik.http.routers.mailhog.tls=true
+      - traefik.http.services.mailhog.loadbalancer.server.port=8025
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    labels:
+      - traefik.tcp.routers.redis.rule=HostSNI(`*`)
+      - traefik.tcp.routers.redis.entryPoints=redis
+      - traefik.tcp.routers.redis.service=redis
+      - traefik.tcp.services.redis.loadbalancer.server.port=6379
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOSTS=redis
+    labels:
+      - traefik.http.routers.redis.rule=Host(`redis.site`)
+      - traefik.http.routers.redis.entrypoints=https
+      - traefik.http.routers.redis.tls=true
+      - traefik.http.services.redis.loadbalancer.server.port=8081
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    volumes:
+      - ./storage/minio:/data
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_BROWSER_REDIRECT_URL: https://minio-console.site
+    labels:
+      # Setup rules for http connection for console
+      - traefik.http.routers.minio-console.service=minio-console
+      - traefik.http.routers.minio-console.rule=Host(`minio-console.site`)
+      - traefik.http.routers.minio-console.entrypoints=https
+      - traefik.http.routers.minio-console.tls=true
+      - traefik.http.services.minio-console.loadbalancer.server.port=9001
+
+      # Setup rules for https connection for api
+      - traefik.http.routers.minio.service=minio
+      - traefik.http.routers.minio.rule=Host(`minio.site`)
+      - traefik.http.routers.minio.entrypoints=https
+      - traefik.http.routers.minio.tls=true
+      - traefik.http.services.minio.loadbalancer.server.port=9000
+    command: server /data --console-address ":9001"
+
+volumes:
+  db:
+    external: true
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy

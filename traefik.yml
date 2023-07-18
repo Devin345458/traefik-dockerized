@@ -1,0 +1,21 @@
+api:
+  dashboard: true
+
+entryPoints:
+  http:
+    address: ":80"
+  https:
+    address: ":443"
+  redis:
+    address: ":6379"
+
+
+providers:
+  docker:
+    network: nginx-proxy
+    endpoint: unix:///var/run/docker.sock
+    watch: true
+    exposedByDefault: true
+
+log:
+  level: DEBUG
