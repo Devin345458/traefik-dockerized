@@ -11,7 +11,7 @@ services:
       DOCKER_LISTEN: "yes"
     restart: unless-stopped
     labels:
-      - traefik.http.routers.minica.rule=Host(`minica.site`)
+      - traefik.http.routers.minica.rule=Host(`minica.localhost`)
       - traefik.http.routers.minica.entrypoints=https
       - traefik.http.routers.minica.tls=true
       - traefik.http.services.minica.loadbalancer.server.port=80
@@ -23,7 +23,7 @@ services:
     networks:
       default:
         aliases:
-          - imagine-retailer-api.site
+          - imagine-retailer-api.localhost
     ports:
       - "80:80"
       - "443:443"
@@ -33,7 +33,7 @@ services:
       - ./traefik.yml:/etc/traefik/traefik.yaml
       - ./certs:/app/certificates
     labels:
-      - traefik.http.routers.traefik-https.rule=Host(`traefik.dashboard.site`)
+      - traefik.http.routers.traefik-https.rule=Host(`traefik.dashboard.localhost`)
       - traefik.http.routers.traefik-https.entrypoints=https
       - traefik.http.routers.traefik-https.tls=true
       - traefik.http.routers.traefik-http.service=api@internal
@@ -60,7 +60,7 @@ services:
     restart: unless-stopped
     # PORT 1025 for SMTP
     labels:
-      - traefik.http.routers.mailhog.rule=Host(`mailhog.site`)
+      - traefik.http.routers.mailhog.rule=Host(`mailhog.localhost`)
       - traefik.http.routers.mailhog.entrypoints=https
       - traefik.http.routers.mailhog.tls=true
       - traefik.http.services.mailhog.loadbalancer.server.port=8025
@@ -82,7 +82,7 @@ services:
     environment:
       - REDIS_HOSTS=redis
     labels:
-      - traefik.http.routers.redis.rule=Host(`redis.site`)
+      - traefik.http.routers.redis.rule=Host(`redis.localhost`)
       - traefik.http.routers.redis.entrypoints=https
       - traefik.http.routers.redis.tls=true
       - traefik.http.services.redis.loadbalancer.server.port=8081
@@ -95,18 +95,18 @@ services:
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
-      MINIO_BROWSER_REDIRECT_URL: https://minio-console.site
+      MINIO_BROWSER_REDIRECT_URL: https://minio-console.localhost
     labels:
       # Setup rules for http connection for console
       - traefik.http.routers.minio-console.service=minio-console
-      - traefik.http.routers.minio-console.rule=Host(`minio-console.site`)
+      - traefik.http.routers.minio-console.rule=Host(`minio-console.localhost`)
       - traefik.http.routers.minio-console.entrypoints=https
       - traefik.http.routers.minio-console.tls=true
       - traefik.http.services.minio-console.loadbalancer.server.port=9001
 
       # Setup rules for https connection for api
       - traefik.http.routers.minio.service=minio
-      - traefik.http.routers.minio.rule=Host(`minio.site`)
+      - traefik.http.routers.minio.rule=Host(`minio.localhost`)
       - traefik.http.routers.minio.entrypoints=https
       - traefik.http.routers.minio.tls=true
       - traefik.http.services.minio.loadbalancer.server.port=9000
