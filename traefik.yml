@@ -9,6 +9,7 @@ entryPoints:
   redis:
     address: ":6379"
 
+accessLog: {}
 
 providers:
   docker:
@@ -16,6 +17,9 @@ providers:
     endpoint: unix:///var/run/docker.sock
     watch: true
     exposedByDefault: true
+  file:
+    directory: /app/certificates
+    watch: true
 
 log:
   level: DEBUG

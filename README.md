@@ -40,6 +40,12 @@ Create your shared network:
 $ docker network create nginx-proxy
 ```
 
+Create DB volume:
+
+```sh
+$ docker volume create db
+```
+
 Start the container by running the following command from the root directory
 
 ```sh
