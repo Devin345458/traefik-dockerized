@@ -28,6 +28,12 @@ services:
       - "80:80"
       - "443:443"
       - "6379:6379"
+      - "4500:4500"
+      - "8080:8080"
+      - "5001:5001"
+      - "9099:9099"
+      - "9199:9199"
+      - "54321:54321"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.yml:/etc/traefik/traefik.yaml
@@ -38,11 +44,13 @@ services:
       - traefik.http.routers.traefik-https.tls=true
       - traefik.http.routers.traefik-http.service=api@internal
       - traefik.http.routers.traefik-https.service=api@internal
+
       # global redirect to https
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+
       - traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)
       - traefik.http.routers.http-catchall.entrypoints=http
       - traefik.http.routers.http-catchall.middlewares=redirect-to-https
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
 
   mariadb:
     image: mariadb:10.7.4
@@ -50,9 +58,31 @@ services:
       - "3306:3306"
     volumes:
       - db:/var/lib/mysql
+      - ./etc/my.cnf:/etc/my.cnf
     restart: unless-stopped
     environment:
       MYSQL_USER: root
+      MYSQL_ROOT_PASSWORD: root
+
+  mysqldb57:
+    platform: linux/x86_64
+    image: mysql:5.7
+    ports:
+      - "3307:3306"
+    volumes:
+      - db57:/var/lib/mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+
+  mysqldb8:
+    image: mysql:8.0
+    ports:
+      - "3308:3306"
+    volumes:
+      - db8:/var/lib/mysql
+    restart: unless-stopped
+    environment:
       MYSQL_ROOT_PASSWORD: root
 
   mailhog:
@@ -82,10 +112,10 @@ services:
     environment:
       - REDIS_HOSTS=redis
     labels:
-      - traefik.http.routers.redis.rule=Host(`redis.localhost`)
-      - traefik.http.routers.redis.entrypoints=https
-      - traefik.http.routers.redis.tls=true
-      - traefik.http.services.redis.loadbalancer.server.port=8081
+      - traefik.http.routers.redis-commander.rule=Host(`redis.localhost`)
+      - traefik.http.routers.redis-commander.entrypoints=https
+      - traefik.http.routers.redis-commander.tls=true
+      - traefik.http.services.redis-commander.loadbalancer.server.port=8081
 
   minio:
     image: minio/minio
@@ -113,6 +143,10 @@ services:
     command: server /data --console-address ":9001"
 
 volumes:
+  db57:
+    external: true
+  db8:
+    external: true
   db:
     external: true
 

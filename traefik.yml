@@ -8,6 +8,18 @@ entryPoints:
     address: ":443"
   redis:
     address: ":6379"
+  firebase_firestore:
+    address: ":8080"
+  firebase_functions:
+    address: ":5001"
+  firebase_auth:
+    address: ":9099"
+  firebase_storage:
+    address: ":9199"
+  firebase_websocket:
+    address: ":54321"
+  firebase_logs:
+    address: ":4500"
 
 accessLog: {}
 
