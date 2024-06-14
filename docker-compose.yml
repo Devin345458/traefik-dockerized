@@ -85,6 +85,36 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
 
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=B+c.Ct02:7dx
+      - MSSQL_PID=Developer
+    ports:
+      - 1433:1433
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P B+c.Ct02:7dx -Q 'SELECT 1' || exit 1" ]
+      interval: 10s
+      retries: 10
+      start_period: 10s
+      timeout: 3s
+
+  sqlserver.configurator:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    command: >
+      bash -c '
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P B+c.Ct02:7dx -d master -i docker-entrypoint-initdb.d/init.sql;
+      echo "All done!"';
+
   mailhog:
     image: mailhog/mailhog:latest
     restart: unless-stopped
@@ -148,6 +178,8 @@ volumes:
   db8:
     external: true
   db:
+    external: true
+  sqlserver_data:
     external: true
 
 networks:
