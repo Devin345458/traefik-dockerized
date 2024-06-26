@@ -126,26 +126,17 @@ services:
       - traefik.http.services.mailhog.loadbalancer.server.port=8025
 
   redis:
-    image: redis:alpine
+    image: redis/redis-stack:latest
     restart: unless-stopped
     labels:
       - traefik.tcp.routers.redis.rule=HostSNI(`*`)
       - traefik.tcp.routers.redis.entryPoints=redis
       - traefik.tcp.routers.redis.service=redis
       - traefik.tcp.services.redis.loadbalancer.server.port=6379
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    restart: unless-stopped
-    depends_on:
-      - redis
-    environment:
-      - REDIS_HOSTS=redis
-    labels:
       - traefik.http.routers.redis-commander.rule=Host(`redis.localhost`)
       - traefik.http.routers.redis-commander.entrypoints=https
       - traefik.http.routers.redis-commander.tls=true
-      - traefik.http.services.redis-commander.loadbalancer.server.port=8081
+      - traefik.http.services.redis-commander.loadbalancer.server.port=8001
 
   minio:
     image: minio/minio
