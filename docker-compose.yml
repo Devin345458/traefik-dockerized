@@ -1,7 +1,15 @@
-version: '3.8'
+# Docker's json-file log driver has no size limit by default. Uncapped, the
+# traefik log (DEBUG level plus access logging) reached 49.9 GB in 11 days
+# (Oct 2026) and filled the Docker VM. Every service keeps at most 3 x 50 MB.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
 
 services:
   minica:
+    logging: *default-logging
     image: ghcr.io/bjornsnoen/minica-traefik-api:latest
     volumes:
       - ./certs:/app/certificates
@@ -20,20 +28,17 @@ services:
     container_name: traefik
     image: traefik:latest
     restart: unless-stopped
+    logging: *default-logging
     networks:
       default:
         aliases:
           - imagine-retailer-api.localhost
+          - minio.localhost
     ports:
       - "80:80"
       - "443:443"
       - "6379:6379"
-      - "4500:4500"
-      - "8080:8080"
-      - "5001:5001"
-      - "9099:9099"
-      - "9199:9199"
-      - "54321:54321"
+      - "1025:1025"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.yml:/etc/traefik/traefik.yaml
@@ -48,11 +53,12 @@ services:
       # global redirect to https
       - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
 
-      - traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)
+      - traefik.http.routers.http-catchall.rule=hostregexp(`{host:([a-zA-Z0-9][a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}}`)
       - traefik.http.routers.http-catchall.entrypoints=http
       - traefik.http.routers.http-catchall.middlewares=redirect-to-https
 
   mariadb:
+    logging: *default-logging
     image: mariadb:10.7.4
     ports:
       - "3306:3306"
@@ -65,6 +71,7 @@ services:
       MYSQL_ROOT_PASSWORD: root
 
   mysqldb57:
+    logging: *default-logging
     platform: linux/x86_64
     image: mysql:5.7
     ports:
@@ -76,56 +83,80 @@ services:
       MYSQL_ROOT_PASSWORD: root
 
   mysqldb8:
+    logging: *default-logging
     image: mysql:8.0
     ports:
       - "3308:3306"
     volumes:
       - db8:/var/lib/mysql
     restart: unless-stopped
+    # Dev box: no replicas / no point-in-time-recovery, so binlogs are pure waste.
+    # A 3-day retention cap (--binlog-expire-logs-seconds=259200) was not enough --
+    # write volume is ~2.5GB/day, so 7.5GB still accrued inside the window and
+    # filled the Docker VM. Disabled outright; re-enable if this box ever needs to
+    # act as a replication source or support point-in-time recovery.
+    command: --skip-log-bin
     environment:
       MYSQL_ROOT_PASSWORD: root
 
+#  sqlserver:
+#    image: mcr.microsoft.com/mssql/server:2019-latest
+#    environment:
+#      - ACCEPT_EULA=Y
+#      - SA_PASSWORD=B+c.Ct02:7dx
+#      - MSSQL_PID=Developer
+#    ports:
+#      - 1433:1433
+#    volumes:
+#      - sqlserver_data:/var/opt/mssql
+#    restart: always
+#    healthcheck:
+#      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P B+c.Ct02:7dx -Q 'SELECT 1' || exit 1" ]
+#      interval: 10s
+#      retries: 10
+#      start_period: 10s
+#      timeout: 3s
+#
+#  sqlserver.configurator:
+#    image: mcr.microsoft.com/mssql/server:2019-latest
+#    volumes:
+#      - ./init:/docker-entrypoint-initdb.d
+#    depends_on:
+#      sqlserver:
+#        condition: service_healthy
+#    command: >
+#      bash -c '
+#      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P B+c.Ct02:7dx -d master -i docker-entrypoint-initdb.d/init.sql;
+#      echo "All done!"';
+
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2019-latest
-    environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=B+c.Ct02:7dx
-      - MSSQL_PID=Developer
+    logging: *default-logging
+    # Azure SQL Edge publishes a native arm64 image (the mssql/server images are
+    # amd64-only and would run emulated on Apple Silicon). Engine 15.x -- supports
+    # cross-database views and STRING_AGG, both of which Latina relies on.
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    restart: unless-stopped
     ports:
-      - 1433:1433
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "1"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-Local!Dev!Passw0rd}"
+      MSSQL_PID: Developer
     volumes:
       - sqlserver_data:/var/opt/mssql
-    restart: always
-    healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P B+c.Ct02:7dx -Q 'SELECT 1' || exit 1" ]
-      interval: 10s
-      retries: 10
-      start_period: 10s
-      timeout: 3s
 
-  sqlserver.configurator:
-    image: mcr.microsoft.com/mssql/server:2019-latest
-    volumes:
-      - ./init:/docker-entrypoint-initdb.d
-    depends_on:
-      sqlserver:
-        condition: service_healthy
-    command: >
-      bash -c '
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P B+c.Ct02:7dx -d master -i docker-entrypoint-initdb.d/init.sql;
-      echo "All done!"';
-
-  mailhog:
-    image: mailhog/mailhog:latest
+  mailpit:
+    logging: *default-logging
+    image: axllent/mailpit:latest
     restart: unless-stopped
-    # PORT 1025 for SMTP
     labels:
-      - traefik.http.routers.mailhog.rule=Host(`mailhog.localhost`)
-      - traefik.http.routers.mailhog.entrypoints=https
-      - traefik.http.routers.mailhog.tls=true
-      - traefik.http.services.mailhog.loadbalancer.server.port=8025
+      - traefik.http.routers.mailpit.rule=Host(`mailpit.localhost`)
+      - traefik.http.routers.mailpit.entrypoints=https
+      - traefik.http.routers.mailpit.tls=true
+      - traefik.http.services.mailpit.loadbalancer.server.port=8025
 
   redis:
+    logging: *default-logging
     image: redis/redis-stack:latest
     restart: unless-stopped
     labels:
@@ -139,6 +170,7 @@ services:
       - traefik.http.services.redis-commander.loadbalancer.server.port=8001
 
   minio:
+    logging: *default-logging
     image: minio/minio
     restart: unless-stopped
     volumes:
@@ -171,7 +203,6 @@ volumes:
   db:
     external: true
   sqlserver_data:
-    external: true
 
 networks:
   default:
