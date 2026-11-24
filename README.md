@@ -105,7 +105,9 @@ This is a mail capturing service. It can be accessed on https://mailhog.localhos
 
 ### Minio
 
-This is local S3 storage. It can be accessed on https://minio-console.localhost and will store all files in the ``/storage/minio`` directory. In order to use it you must set your S3 server to host ``minio`` port `` 9000``
+This is local S3 storage. It can be accessed on https://minio-console.localhost and will store all files in the ``/storage/minio`` directory. In order to use it you must set your S3 server to host ``minio`` port `` 9000``. Log in to the console with ``minio`` / ``minio123``.
+
+The image is ``pgsty/silo``, a maintained community fork of MinIO. The official ``minio/minio`` image no longer exists on Docker Hub. Silo uses the same environment variables and data format, so an existing ``storage/minio`` folder keeps working. The service is still named ``minio``.
 
 ### Notes
 You can modify any of these urls by changing the ``docker-compose.yml`` file. You just need to update the ``traefik.http.routers.$SERVICE.rule=Host(`$DOCKER_DOMAIN`)`` to the domain you would like to use
@@ -121,4 +123,4 @@ You can modify any of these urls by changing the ``docker-compose.yml`` file. Yo
 - [Redis](https://redis.com/)
 - [Redis Commander](https://github.com/joeferner/redis-commander)
 - [Mailhog](https://github.com/mailhog/MailHog)
-- [Minio](https://github.com/minio/minio)
+- [Silo (MinIO fork)](https://github.com/pgsty/silo)

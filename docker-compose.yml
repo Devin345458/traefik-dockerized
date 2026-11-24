@@ -169,9 +169,14 @@ services:
       - traefik.http.routers.redis-commander.tls=true
       - traefik.http.services.redis-commander.loadbalancer.server.port=8001
 
+  # Local S3. Upstream MinIO ended community image distribution, and
+  # minio/minio is gone from Docker Hub and quay.io. pgsty/silo is the maintained community
+  # fork (formerly pgsty/minio): same MINIO_* env vars, same "server" command,
+  # same .minio.sys data, and it reads data written by older MinIO images.
+  # Pinned because an unpinned image is what broke here.
   minio:
     logging: *default-logging
-    image: minio/minio
+    image: pgsty/silo:RELEASE.2026-11-12T00-00-00Z
     restart: unless-stopped
     volumes:
       - ./storage/minio:/data
